@@ -1,0 +1,5 @@
+float64 ego_pos
+float64 ego_vel
+float64 desired_vel
+---
+float64 acceleration
