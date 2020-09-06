@@ -1,5 +1,34 @@
 #include "nlopt_problem.h"
 
+int get_index(int t, objvar o)
+{
+    switch (o)
+    {
+        case objvar::X:
+            return t*4 + 0;
+        case objvar::Y:
+            return t*4 + 1;
+        case objvar::V:
+            return t*4 + 2;
+        case objvar::YAW:
+            return t*4 + 3;
+        case objvar::ACC:
+            return 4*(horizon+1) + t*2 + 0;
+        case objvar::TURN:
+            return 4*(horizon+1) + t*2 + 1;
+    }
+}
+
+double beta_transform(double delta, double lr, double lf)
+{
+    return delta;
+}
+
+double beta_inv_transform(double beta, double lr, double lf)
+{
+    return beta;
+}
+
 double objective_function(const std::vector<double> &x, std::vector<double> &grad, void *data)
 {
     objective_data *d = reinterpret_cast<objective_data*>(data);
@@ -7,13 +36,14 @@ double objective_function(const std::vector<double> &x, std::vector<double> &gra
     double val = 0;
     for (int t = 0; t < horizon+1; t++)
     {
-        val += d->alpha[0]*math.pow( x[get_index(t, objvar::V)] - d->v_desired, 2);
-        val += d->alpha[1]*math.pow( x[get_index(t, objvar::YAW)] - d->yaw_desired, 2);
+        val += d->alpha[0]*pow( x[get_index(t, objvar::V)] - d->v_desired, 2);
+        val += d->alpha[1]*pow( x[get_index(t, objvar::YAW)] - d->yaw_desired, 2);
+    }
     
     for (int t = 0; t < horizon; t++)
     {
-        val += d->alpha[2]*math.pow( x[get_index(t, objvar::ACC)], 2);
-        val += d->alpha[3]*math.pow( x[get_index(t, objvar::TURN)], 2);
+        val += d->alpha[2]*pow( x[get_index(t, objvar::ACC)], 2);
+        val += d->alpha[3]*pow( x[get_index(t, objvar::TURN)], 2);
     }
 
     if (!grad.empty())
@@ -83,9 +113,9 @@ void constraint_vel_update(unsigned m, double *result, unsigned n, const double*
                 grad[t*n+j] = 0;
             }
             // Only three variables are in each constraint
-            grad[i*n + get_index(t+1, objvar::V)] = 1;
-            grad[i*n + get_index(t, objvar::V)]   = -1;
-            grad[i*n + get_index(t, objvar::ACC)] = -(p->dt);
+            grad[t*n + get_index(t+1, objvar::V)] = 1;
+            grad[t*n + get_index(t, objvar::V)]   = -1;
+            grad[t*n + get_index(t, objvar::ACC)] = -(p->dt);
         }
     }
 }
