@@ -1,0 +1,11 @@
+float64 ego_pos_x
+float64 ego_pos_y
+float64 ego_vel
+float64 ego_yaw
+float64 desired_pos_x
+float64 desired_pos_y
+float64 desired_vel
+float64 desired_yaw
+---
+float64 acceleration
+float64 turning_angle 
