@@ -1,32 +1,35 @@
 #include "nlopt_problem.h"
 
-int get_index(int t, objvar o)
+int get_index(int t, StateEnum o)
 {
     switch (o)
     {
-        case objvar::X:
+        case StateEnum::X:
             return t*4 + 0;
-        case objvar::Y:
+        case StateEnum::Y:
             return t*4 + 1;
-        case objvar::V:
+        case StateEnum::V:
             return t*4 + 2;
-        case objvar::YAW:
+        case StateEnum::YAW:
             return t*4 + 3;
-        case objvar::ACC:
+        case StateEnum::ACC:
             return 4*(horizon+1) + t*2 + 0;
-        case objvar::TURN:
+        case StateEnum::BETA:
             return 4*(horizon+1) + t*2 + 1;
     }
 }
 
-double beta_transform(double delta, double lr, double lf)
+double beta_transform(double turn_angle, double lr, double lf)
 {
-    return delta;
+    return atan( (lr/(lr+lf)) * tan(turn_angle)); 
 }
 
+// beta_transform is invertible in the open interval (-pi/2,pi/2)
+// which is reasonable, since it doesn't make sense for wheels 
+// to turn more than 90 degrees
 double beta_inv_transform(double beta, double lr, double lf)
 {
-    return beta;
+    return atan( ((lr+lf)/lr) * tan(beta)); 
 }
 
 double objective_function(const std::vector<double> &x, std::vector<double> &grad, void *data)
@@ -36,29 +39,29 @@ double objective_function(const std::vector<double> &x, std::vector<double> &gra
     double val = 0;
     for (int t = 0; t < horizon+1; t++)
     {
-        val += d->alpha[0]*pow( x[get_index(t, objvar::V)] - d->v_desired, 2);
-        val += d->alpha[1]*pow( x[get_index(t, objvar::YAW)] - d->yaw_desired, 2);
+        val += d->alpha[0]*pow( x[get_index(t, StateEnum::V)] - d->v_desired, 2);
+        val += d->alpha[1]*pow( x[get_index(t, StateEnum::YAW)] - d->yaw_desired, 2);
     }
     
     for (int t = 0; t < horizon; t++)
     {
-        val += d->alpha[2]*pow( x[get_index(t, objvar::ACC)], 2);
-        val += d->alpha[3]*pow( x[get_index(t, objvar::TURN)], 2);
+        val += d->alpha[2]*pow( x[get_index(t, StateEnum::ACC)], 2);
+        val += d->alpha[3]*pow( x[get_index(t, StateEnum::BETA)], 2);
     }
 
     if (!grad.empty())
     {
         for (int t = 0; t < horizon+1; t++)
         {
-            grad[get_index(t, objvar::X)] = 0;
-            grad[get_index(t, objvar::Y)] = 0;
-            grad[get_index(t, objvar::V)] = 2*d->alpha[0]*(x[get_index(t, objvar::V)] - d->v_desired);
-            grad[get_index(t, objvar::YAW)] = 2*d->alpha[1]*(x[get_index(t, objvar::YAW)] - d->yaw_desired);
+            grad[get_index(t, StateEnum::X)] = 0;
+            grad[get_index(t, StateEnum::Y)] = 0;
+            grad[get_index(t, StateEnum::V)] = 2*d->alpha[0]*(x[get_index(t, StateEnum::V)] - d->v_desired);
+            grad[get_index(t, StateEnum::YAW)] = 2*d->alpha[1]*(x[get_index(t, StateEnum::YAW)] - d->yaw_desired);
         }
         for (int t = 0; t < horizon; t++)
         {
-            grad[get_index(t, objvar::ACC)] = 2*d->alpha[2]*get_index(t, objvar::ACC);
-            grad[get_index(t, objvar::TURN)] = 3*d->alpha[2]*get_index(t, objvar::TURN);
+            grad[get_index(t, StateEnum::ACC)] = 2*d->alpha[2]*get_index(t, StateEnum::ACC);
+            grad[get_index(t, StateEnum::BETA)] = 3*d->alpha[2]*get_index(t, StateEnum::BETA);
         }
     }
     return val;
@@ -96,9 +99,9 @@ void constraint_vel_update(unsigned m, double *result, unsigned n, const double*
     problem_parameters* p = (problem_parameters*) f_data;
     for (int t = 0; t < m; t++)
     {
-        double v_t1 = x[get_index(t+1, objvar::V)];
-        double v_t  = x[get_index(t, objvar::V)];
-        double a_t  = x[get_index(t, objvar::ACC)];
+        double v_t1 = x[get_index(t+1, StateEnum::V)];
+        double v_t  = x[get_index(t, StateEnum::V)];
+        double a_t  = x[get_index(t, StateEnum::ACC)];
         result[t] = v_t1 - (v_t + p->dt*a_t);
     }
 
@@ -113,15 +116,123 @@ void constraint_vel_update(unsigned m, double *result, unsigned n, const double*
                 grad[t*n+j] = 0;
             }
             // Only three variables are in each constraint
-            grad[t*n + get_index(t+1, objvar::V)] = 1;
-            grad[t*n + get_index(t, objvar::V)]   = -1;
-            grad[t*n + get_index(t, objvar::ACC)] = -(p->dt);
+            grad[t*n + get_index(t+1, StateEnum::V)] = 1;
+            grad[t*n + get_index(t, StateEnum::V)]   = -1;
+            grad[t*n + get_index(t, StateEnum::ACC)] = -(p->dt);
         }
     }
 }
 
+// m = horizon
+// constraint is x[t+1] = x[t] + dt v[t] cos(yaw[t]+beta[t]), t = 0..H
+void constraint_x_update(unsigned m, double *result, unsigned n, const double* x, double* grad, void* f_data)
+{
+    problem_parameters* p = (problem_parameters*) f_data;
+    for (int t = 0; t < m; t++)
+    {
+        double x_t1 = x[get_index(t+1, StateEnum::X)];
+        double x_t = x[get_index(t, StateEnum::X)];
+        double v_t  = x[get_index(t, StateEnum::V)];
+        double yaw_t  = x[get_index(t, StateEnum::YAW)];
+        double beta_t  = x[get_index(t, StateEnum::BETA)];
+        result[t] = x_t1 - (x_t + p->dt*v_t*cos(yaw_t+beta_t));
+    }
 
+    if (grad != NULL)
+    {
+        // For each time
+        for (int t = 0; t < m; t++)
+        {
+            // Set them all to 0.
+            for (int j = 0; j < n; j++)
+            {
+                grad[t*n+j] = 0;
+            }
+            double v_t  = x[get_index(t, StateEnum::V)];
+            double yaw_t  = x[get_index(t, StateEnum::YAW)];
+            double beta_t  = x[get_index(t, StateEnum::BETA)];
+            // Only five variables are in each constraint
+            grad[t*n + get_index(t+1, StateEnum::X)] = 1;
+            grad[t*n + get_index(t, StateEnum::X)]   = -1;
+            grad[t*n + get_index(t, StateEnum::V)] = -(p->dt*cos(yaw_t+beta_t));
+            grad[t*n + get_index(t, StateEnum::YAW)] = p->dt*v_t*sin(yaw_t+beta_t);
+            grad[t*n + get_index(t, StateEnum::BETA)] = p->dt*v_t*sin(yaw_t+beta_t);
+        }
+    }
+}
 
+// m = horizon
+// constraint is y[t+1] = y[t] + dt v[t] sin(yaw[t]+beta[t]), t = 0..H
+void constraint_y_update(unsigned m, double *result, unsigned n, const double* x, double* grad, void* f_data)
+{
+    problem_parameters* p = (problem_parameters*) f_data;
+    for (int t = 0; t < m; t++)
+    {
+        double y_t1 = x[get_index(t+1, StateEnum::Y)];
+        double y_t = x[get_index(t, StateEnum::Y)];
+        double v_t  = x[get_index(t, StateEnum::V)];
+        double yaw_t  = x[get_index(t, StateEnum::YAW)];
+        double beta_t  = x[get_index(t, StateEnum::BETA)];
+        result[t] = y_t1 - (y_t + p->dt*v_t*sin(yaw_t+beta_t));
+    }
+
+    if (grad != NULL)
+    {
+        // For each time
+        for (int t = 0; t < m; t++)
+        {
+            // Set them all to 0.
+            for (int j = 0; j < n; j++)
+            {
+                grad[t*n+j] = 0;
+            }
+            double v_t  = x[get_index(t, StateEnum::V)];
+            double yaw_t  = x[get_index(t, StateEnum::YAW)];
+            double beta_t  = x[get_index(t, StateEnum::BETA)];
+            // Only five variables are in each constraint
+            grad[t*n + get_index(t+1, StateEnum::Y)] = 1;
+            grad[t*n + get_index(t, StateEnum::Y)]   = -1;
+            grad[t*n + get_index(t, StateEnum::V)] = -(p->dt*sin(yaw_t+beta_t));
+            grad[t*n + get_index(t, StateEnum::YAW)] = -(p->dt*v_t*cos(yaw_t+beta_t));
+            grad[t*n + get_index(t, StateEnum::BETA)] = -(p->dt*v_t*cos(yaw_t+beta_t));
+        }
+    }
+}
+
+// m = horizon
+// constraint is yaw[t+1] = yaw[t] + dt v[t]/lr sin(beta[t]), t = 0..H
+void constraint_y_update(unsigned m, double *result, unsigned n, const double* x, double* grad, void* f_data)
+{
+    problem_parameters* p = (problem_parameters*) f_data;
+    for (int t = 0; t < m; t++)
+    {
+        double yaw_t1 = x[get_index(t+1, StateEnum::YAW)];
+        double yaw_t = x[get_index(t, StateEnum::YAW)];
+        double v_t  = x[get_index(t, StateEnum::V)];
+        double beta_t  = x[get_index(t, StateEnum::BETA)];
+        result[t] = yaw_t1 - (yaw_t + p->dt*v_t*sin(beta_t)/p->lr);
+    }
+
+    if (grad != NULL)
+    {
+        // For each time
+        for (int t = 0; t < m; t++)
+        {
+            // Set them all to 0.
+            for (int j = 0; j < n; j++)
+            {
+                grad[t*n+j] = 0;
+            }
+            double v_t  = x[get_index(t, StateEnum::V)];
+            double beta_t  = x[get_index(t, StateEnum::BETA)];
+            // Only four variables are in each constraint
+            grad[t*n + get_index(t+1, StateEnum::YAW)] = 1;
+            grad[t*n + get_index(t, StateEnum::YAW)]   = -1;
+            grad[t*n + get_index(t, StateEnum::V)] = -(p->dt*sin(beta_t)/p->lr);
+            grad[t*n + get_index(t, StateEnum::BETA)] = -(p->dt*v_t*cos(beta_t));
+        }
+    }
+}
 
 
 
