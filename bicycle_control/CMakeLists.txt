@@ -137,10 +137,26 @@ add_executable(bicycle_mpc_server
     src/nlopt_problem.cpp
 )
 
+add_executable(bicycle_mpc_client
+    src/bicycle_mpc_client.cpp
+)
+
+add_dependencies(bicycle_mpc_server
+    bicycle_control_generate_messages_cpp
+)
+
+add_dependencies(bicycle_mpc_client
+    bicycle_control_generate_messages_cpp
+)
+
 target_link_libraries(bicycle_mpc_server
     ${catkin_LIBRARIES}
     "/usr/local/lib/libnlopt.so"
     m   
+)
+
+target_link_libraries(bicycle_mpc_client
+    ${catkin_LIBRARIES}
 )
 
 
