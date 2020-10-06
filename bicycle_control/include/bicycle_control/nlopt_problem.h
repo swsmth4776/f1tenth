@@ -55,6 +55,8 @@ void constraint_vel_update(unsigned m, double *result, unsigned n, const double*
 
 void constraint_yaw_update(unsigned m, double *result, unsigned n, const double* x, double* grad, void* constraint_data);
 
+void constraint_beta_zero(unsigned m, double *result, unsigned n, const double* x, double* grad, void* constraint_data);
+
 void set_lb(double lb[], unsigned n);
 void set_ub(double ub[], unsigned n);
 

@@ -235,6 +235,32 @@ void constraint_yaw_update(unsigned m, double *result, unsigned n, const double*
     }
 }
 
+
+void constraint_beta_zero(unsigned m, double *result, unsigned n, const double* x, double* grad, void* constraint_data)
+{
+    problem_parameters* p = (problem_parameters*) constraint_data;
+    for (int t = 0; t < m; t++)
+    {
+        double yaw_t = x[get_index(t, StateEnum::YAW)];
+        result[t] = yaw_t;
+    }
+
+    if (grad != NULL)
+    {
+        // For each time
+        for (int t = 0; t < m; t++)
+        {
+            // Set them all to 0.
+            for (int j = 0; j < n; j++)
+            {
+                grad[t*n+j] = 0;
+            }
+
+            grad[t*n + get_index(t, StateEnum::YAW)] = 1;
+        }
+    }
+}
+
 void set_lb(double lb[], unsigned n)
 {
     for (int t = 0; t < n; t++)

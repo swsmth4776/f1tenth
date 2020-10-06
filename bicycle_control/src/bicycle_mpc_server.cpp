@@ -41,6 +41,12 @@ void initial_guess(double* x)
 bool bicycle_mpc_solver(bicycle_control::BicycleMPC::Request  &req,
                         bicycle_control::BicycleMPC::Response &res)
 {
+    opt = nlopt_create(NLOPT_LD_SLSQP, dimensionality);
+    set_lb(lb, dimensionality);
+    set_ub(ub, dimensionality);
+    nlopt_set_lower_bounds(opt, lb);
+    nlopt_set_upper_bounds(opt, ub);
+
     objective_data od{ {1.0, 1.0, 1.0, 1.0}, req.desired_vel, req.desired_yaw };
     problem_parameters p{dt, lr, lf, {req.ego_pos_x, req.ego_pos_y, req.ego_vel, req.ego_yaw}};
 
@@ -49,9 +55,11 @@ bool bicycle_mpc_solver(bicycle_control::BicycleMPC::Request  &req,
     nlopt_add_equality_mconstraint(opt, horizon, constraint_y_update, &p, NULL);
     nlopt_add_equality_mconstraint(opt, horizon, constraint_vel_update, &p, NULL);
     nlopt_add_equality_mconstraint(opt, horizon, constraint_yaw_update, &p, NULL);
+    nlopt_add_equality_mconstraint(opt, horizon, constraint_beta_zero, &p, NULL);
 
     // set relative tolerance for optimization variables
     nlopt_set_xtol_rel(opt, 1e-4);
+    nlopt_set_ftol_abs(opt, 1e-4);
 
     // Use the ODE solver to simulate a trajector to provide a reasonable starting guess
     double x[dimensionality];
@@ -97,11 +105,6 @@ int main(int argc, char **argv)
 // of the constraints.
 //
 // [1]: https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/#slsqp
-    opt = nlopt_create(NLOPT_LD_SLSQP, dimensionality);
-    set_lb(lb, dimensionality);
-    set_ub(ub, dimensionality);
-    nlopt_set_lower_bounds(opt, lb);
-    nlopt_set_upper_bounds(opt, ub);
 
 
     ros::ServiceServer service = n.advertiseService("bicycle_mpc", bicycle_mpc_solver);
