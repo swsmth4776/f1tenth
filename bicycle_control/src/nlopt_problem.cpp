@@ -56,13 +56,12 @@ double objective_function(unsigned int n, double const*  x, double* grad, void* 
             grad[get_index(t, StateEnum::X)] = 0;
             grad[get_index(t, StateEnum::Y)] = 0;
             grad[get_index(t, StateEnum::V)] = 2*d->alpha[0]*(x[get_index(t, StateEnum::V)] - d->v_desired);
-            grad[get_index(t, StateEnum::YAW)] = 0;
             grad[get_index(t, StateEnum::YAW)] = 2*d->alpha[1]*(x[get_index(t, StateEnum::YAW)] - d->yaw_desired);
         }
         for (int t = 0; t < horizon; t++)
         {
             grad[get_index(t, StateEnum::ACC)] = 2*d->alpha[2]*get_index(t, StateEnum::ACC);
-            grad[get_index(t, StateEnum::BETA)] = 3*d->alpha[2]*get_index(t, StateEnum::BETA);
+            grad[get_index(t, StateEnum::BETA)] = 2*d->alpha[3]*get_index(t, StateEnum::BETA);
         }
     }
     return val;

@@ -47,10 +47,13 @@ bool bicycle_mpc_solver(bicycle_control::BicycleMPC::Request  &req,
     nlopt_set_lower_bounds(opt, lb);
     nlopt_set_upper_bounds(opt, ub);
 
-    objective_data od{ {1.0, 1.0, 1.0, 1.0}, req.desired_vel, req.desired_yaw };
+    ROS_INFO("Desired velocity, yaw: [%f, %f]", (double)req.desired_vel, (double)req.desired_yaw);
+
+    objective_data od{ {1.0, 1.0, 0, 0}, req.desired_vel, req.desired_yaw };
     problem_parameters p{dt, lr, lf, {req.ego_pos_x, req.ego_pos_y, req.ego_vel, req.ego_yaw}};
 
     nlopt_set_min_objective(opt, objective_function, &od);
+//    nlopt_add_equality_mconstraint(opt, 4, constraint_init_state, &p, NULL);
     nlopt_add_equality_mconstraint(opt, horizon, constraint_x_update, &p, NULL);
     nlopt_add_equality_mconstraint(opt, horizon, constraint_y_update, &p, NULL);
     nlopt_add_equality_mconstraint(opt, horizon, constraint_vel_update, &p, NULL);
@@ -74,13 +77,20 @@ bool bicycle_mpc_solver(bicycle_control::BicycleMPC::Request  &req,
     initial_guess(x);
 
     double minf = 0;
-    if (nlopt_optimize(opt, x, &minf) < 0)
+    nlopt_result result = nlopt_optimize(opt, x, &minf);
+    ROS_INFO("NLOPT return code: %d", (int)result);
+    if (result < 0 && result != -4)
     {
         ROS_INFO("nlopt failed!\n");
         ROS_INFO("minf is %f\n", minf);
     }
     else
     {
+        for (int t = 0; t < horizon; t++)
+        {
+            ROS_INFO("v[%d]=%f", t, x[get_index(t, StateEnum::V)]);
+
+        }
         double opt_turning_angle = beta_inv_transform(x[get_index(0, StateEnum::BETA)], lr, lf);
         double opt_a = x[get_index(0, StateEnum::ACC)];
 

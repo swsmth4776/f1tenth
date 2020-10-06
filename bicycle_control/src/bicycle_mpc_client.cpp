@@ -32,7 +32,8 @@ int main(int argc, char **argv)
     srv.request.desired_yaw = 0;
 
     double epsilon = 0.01;
-    while (std::abs(srv.request.desired_vel - srv.request.ego_vel) > epsilon)
+    int count = 0;
+    while (std::abs(srv.request.desired_vel - srv.request.ego_vel) > epsilon && count < 30)
     {
         if (!client.call(srv))
         {
@@ -40,8 +41,9 @@ int main(int argc, char **argv)
             return 1;
         }
 
+        ROS_INFO("t = %d", count);
         ROS_INFO("State:   [%f, %f, %f, %f]", (double)srv.request.ego_pos_x, (double)srv.request.ego_pos_y, (double)srv.request.ego_vel, (double)srv.request.ego_yaw);
-        ROS_INFO("Control: [%f, %f]", (double)srv.response.acceleration, (double)srv.response.turning_angle);
+        ROS_INFO("Control: [%f, %f]\n", (double)srv.response.acceleration, (double)srv.response.turning_angle);
 
         // x = [pos_x, pos_y, vel, yaw, acc, turn]
         state_type x(6);
@@ -59,6 +61,7 @@ int main(int argc, char **argv)
         srv.request.ego_pos_y = x[1];
         srv.request.ego_vel = x[2];
         srv.request.ego_yaw = x[3];
+        count++;
     }
 
     return 0;
