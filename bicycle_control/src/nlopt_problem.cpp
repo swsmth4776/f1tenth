@@ -32,7 +32,7 @@ double beta_inv_transform(double beta, double lr, double lf)
     return atan( ((lr+lf)/lr) * tan(beta)); 
 }
 
-double objective_function(const std::vector<double> &x, std::vector<double> &grad, void *data)
+double objective_function(unsigned int n, double const*  x, double* grad, void* data)
 {
     objective_data *d = reinterpret_cast<objective_data*>(data);
 
@@ -49,7 +49,7 @@ double objective_function(const std::vector<double> &x, std::vector<double> &gra
         val += d->alpha[3]*pow( x[get_index(t, StateEnum::BETA)], 2);
     }
 
-    if (!grad.empty())
+    if (grad != nullptr)
     {
         for (int t = 0; t < horizon+1; t++)
         {
@@ -235,5 +235,33 @@ void constraint_yaw_update(unsigned m, double *result, unsigned n, const double*
     }
 }
 
+void set_lb(double lb[], unsigned n)
+{
+    for (int t = 0; t < n; t++)
+    {
+        lb[t] = -HUGE_VAL;
+    }
 
+    for (int t = 0; t < horizon; t++)
+    {
+        lb[get_index(t, StateEnum::V)] = 0;
+        lb[get_index(t, StateEnum::ACC)] = -2;
+        lb[get_index(t, StateEnum::BETA)] = beta_transform(-M_PI/12, lr, lf);
+    }
+}
+
+void set_ub(double ub[], unsigned n)
+{
+    for (int t = 0; t < n; t++)
+    {
+        ub[t] = HUGE_VAL;
+    }
+
+    for (int t = 0; t < horizon; t++)
+    {
+        ub[get_index(t, StateEnum::V)] = 20;
+        ub[get_index(t, StateEnum::ACC)] = 2;
+        ub[get_index(t, StateEnum::BETA)] = beta_transform(M_PI/12, lr, lf);
+    }
+}
 
