@@ -30,9 +30,17 @@ enum class StateEnum: int8_t
 int get_index(int t, StateEnum o);
 
 typedef struct {
-    double alpha[4];
+    double alpha[6];
     double v_desired, yaw_desired;
-} objective_data;
+} velocity_control_data;
+
+typedef struct {
+    double alpha[6];
+    double x_desired[horizon];
+    double y_desired[horizon];
+    double v_desired[horizon];
+    double yaw_desired[horizon];
+} trajectory_control_data;
 
 typedef struct {
     double dt, lr, lf;
@@ -43,7 +51,9 @@ double beta_transform(double turn_angle, double lr, double lf);
 
 double beta_inv_transform(double beta, double lr, double lf);
 
-double objective_function(unsigned n, const double *x, double *grad, void *objective_data);
+double objective_function_velocity_control(unsigned n, const double *x, double *grad, void *objective_data);
+
+double objective_function_trajectory_control(unsigned n, const double *x, double *grad, void *objective_data);
 
 void constraint_init_state(unsigned m, double *result, unsigned n, const double* x, double* grad, void* constraint_data);
 

@@ -32,9 +32,9 @@ double beta_inv_transform(double beta, double lr, double lf)
     return atan( ((lr+lf)/lr) * tan(beta)); 
 }
 
-double objective_function(unsigned int n, double const*  x, double* grad, void* data)
+double objective_function_velocity_control(unsigned int n, double const*  x, double* grad, void* data)
 {
-    objective_data *d = reinterpret_cast<objective_data*>(data);
+    velocity_control_data *d = reinterpret_cast<velocity_control_data*>(data);
 
     double val = 0;
     for (int t = 0; t < horizon+1; t++)
@@ -45,8 +45,8 @@ double objective_function(unsigned int n, double const*  x, double* grad, void* 
     
     for (int t = 0; t < horizon; t++)
     {
-        val += d->alpha[2]*pow( x[get_index(t, StateEnum::ACC)], 2);
-        val += d->alpha[3]*pow( x[get_index(t, StateEnum::BETA)], 2);
+        val += d->alpha[4]*pow( x[get_index(t, StateEnum::ACC)], 2);
+        val += d->alpha[5]*pow( x[get_index(t, StateEnum::BETA)], 2);
     }
 
     if (grad != nullptr)
@@ -60,12 +60,51 @@ double objective_function(unsigned int n, double const*  x, double* grad, void* 
         }
         for (int t = 0; t < horizon; t++)
         {
-            grad[get_index(t, StateEnum::ACC)] = 2*d->alpha[2]*get_index(t, StateEnum::ACC);
-            grad[get_index(t, StateEnum::BETA)] = 2*d->alpha[3]*get_index(t, StateEnum::BETA);
+            grad[get_index(t, StateEnum::ACC)] = 2*d->alpha[4]*get_index(t, StateEnum::ACC);
+            grad[get_index(t, StateEnum::BETA)] = 2*d->alpha[5]*get_index(t, StateEnum::BETA);
         }
     }
     return val;
 }
+
+
+double objective_function_trajectory_control(unsigned int n, double const*  x, double* grad, void* data)
+{
+    trajectory_control_data* d = reinterpret_cast<trajectory_control_data*>(data);
+
+    double val = 0;
+    for (int t = 0; t < horizon+1; t++)
+    {
+        val += d->alpha[0]*pow( x[get_index(t, StateEnum::X)] - d->x_desired[t], 2);
+        val += d->alpha[1]*pow( x[get_index(t, StateEnum::Y)] - d->y_desired[t], 2);
+        val += d->alpha[2]*pow( x[get_index(t, StateEnum::V)] - d->v_desired[t], 2);
+        val += d->alpha[3]*pow( x[get_index(t, StateEnum::YAW)] - d->yaw_desired[t], 2);
+    }
+    
+    for (int t = 0; t < horizon; t++)
+    {
+        val += d->alpha[4]*pow( x[get_index(t, StateEnum::ACC)], 2);
+        val += d->alpha[5]*pow( x[get_index(t, StateEnum::BETA)], 2);
+    }
+
+    if (grad != nullptr)
+    {
+        for (int t = 0; t < horizon+1; t++)
+        {
+            grad[get_index(t, StateEnum::X)] = 2*d->alpha[0]*(x[get_index(t, StateEnum::X)] - d->x_desired[t]);
+            grad[get_index(t, StateEnum::Y)] = 2*d->alpha[1]*(x[get_index(t, StateEnum::Y)] - d->y_desired[t]);
+            grad[get_index(t, StateEnum::V)] = 2*d->alpha[2]*(x[get_index(t, StateEnum::V)] - d->v_desired[t]);
+            grad[get_index(t, StateEnum::YAW)] = 2*d->alpha[3]*(x[get_index(t, StateEnum::YAW)] - d->yaw_desired[t]);
+        }
+        for (int t = 0; t < horizon; t++)
+        {
+            grad[get_index(t, StateEnum::ACC)] = 2*d->alpha[4]*get_index(t, StateEnum::ACC);
+            grad[get_index(t, StateEnum::BETA)] = 2*d->alpha[5]*get_index(t, StateEnum::BETA);
+        }
+    }
+    return val;
+}
+
 
 // constraint_init_state
 // m = 4

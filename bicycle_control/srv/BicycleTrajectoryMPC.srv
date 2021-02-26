@@ -1,0 +1,7 @@
+float64[21] pos_x
+float64[21] pos_y
+float64[21] vel
+float64[21] yaw
+---
+float64 acceleration
+float64 turning_angle 

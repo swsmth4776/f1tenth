@@ -46,16 +46,17 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
+add_message_files(
+  FILES
+  MotionPrimitive.msg
 #   Message2.msg
-# )
+)
 
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
   BicycleMPC.srv
+  BicycleTrajectoryMPC.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -137,15 +138,40 @@ add_executable(bicycle_mpc_server
     src/nlopt_problem.cpp
 )
 
+add_executable(bicycle_trajectory_mpc_server
+    src/bicycle_trajectory_mpc_server.cpp
+    src/nlopt_problem.cpp
+)
+
 add_executable(bicycle_mpc_client
     src/bicycle_mpc_client.cpp
+)
+
+add_executable(bicycle_trajectory_mpc_client
+    src/bicycle_trajectory_mpc_client.cpp
+)
+
+add_executable(dubins_mp
+    src/dubins_motion_primitive_node.cpp
 )
 
 add_dependencies(bicycle_mpc_server
     bicycle_control_generate_messages_cpp
 )
 
+add_dependencies(bicycle_trajectory_mpc_server
+    bicycle_control_generate_messages_cpp
+)
+
 add_dependencies(bicycle_mpc_client
+    bicycle_control_generate_messages_cpp
+)
+
+add_dependencies(bicycle_trajectory_mpc_client
+    bicycle_control_generate_messages_cpp
+)
+
+add_dependencies(dubins_mp
     bicycle_control_generate_messages_cpp
 )
 
@@ -155,7 +181,21 @@ target_link_libraries(bicycle_mpc_server
     m   
 )
 
+target_link_libraries(bicycle_trajectory_mpc_server
+    ${catkin_LIBRARIES}
+    "/usr/local/lib/libnlopt.so"
+    m   
+)
+
 target_link_libraries(bicycle_mpc_client
+    ${catkin_LIBRARIES}
+)
+
+target_link_libraries(bicycle_trajectory_mpc_client
+    ${catkin_LIBRARIES}
+)
+
+target_link_libraries(dubins_mp
     ${catkin_LIBRARIES}
 )
 

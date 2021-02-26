@@ -1,7 +1,7 @@
 #include "ros/ros.h"
 #include <string>
 
-#include "bicycle_control/BicycleMPC.h"
+#include "bicycle_control/BicycleTrajectoryMPC.h"
 #include "bicycle_ode.h"
 #include "nlopt_problem.h"
 
@@ -37,9 +37,8 @@ void initial_guess(double* x)
 
 // warm start
 
-
-bool bicycle_mpc_solver(bicycle_control::BicycleMPC::Request  &req,
-                        bicycle_control::BicycleMPC::Response &res)
+bool bicycle_mpc_solver(bicycle_control::BicycleTrajectoryMPC::Request  &req,
+                        bicycle_control::BicycleTrajectoryMPC::Response &res)
 {
     opt = nlopt_create(NLOPT_LD_SLSQP, dimensionality);
     set_lb(lb, dimensionality);
@@ -47,12 +46,17 @@ bool bicycle_mpc_solver(bicycle_control::BicycleMPC::Request  &req,
     nlopt_set_lower_bounds(opt, lb);
     nlopt_set_upper_bounds(opt, ub);
 
-    ROS_INFO("Desired velocity, yaw: [%f, %f]", (double)req.desired_vel, (double)req.desired_yaw);
+    ROS_INFO("Final desired x, y, v, yaw: [%f, %f]", (double)req.pos_x.back(),
+            (double)req.pos_y.back(), (double)req.vel.back(), (double)req.yaw.back());
 
-    velocity_control_data od{{1.0, 1.0, 0, 0, 0, 0}, req.desired_vel, req.desired_yaw};
-    problem_parameters p{dt, lr, lf, {req.ego_pos_x, req.ego_pos_y, req.ego_vel, req.ego_yaw}};
+    trajectory_control_data od{ .alpha = {1.0, 1.0, 1.0, 1.0, 0, 0}};
+    std::copy(req.pos_x.begin() + 1, req.pos_x.end(), od.x_desired);
+    std::copy(req.pos_y.begin() + 1, req.pos_y.end(), od.y_desired);
+    std::copy(req.vel.begin() + 1, req.vel.end(), od.v_desired);
+    std::copy(req.yaw.begin() + 1, req.yaw.end(), od.yaw_desired);
+    problem_parameters p{dt, lr, lf, {req.pos_x[0], req.pos_y[0], req.vel[0], req.yaw[0]}};
 
-    nlopt_set_min_objective(opt, objective_function_velocity_control, &od);
+    nlopt_set_min_objective(opt, objective_function_trajectory_control, &od);
     nlopt_add_equality_mconstraint(opt, 4, constraint_init_state, &p, NULL);
     nlopt_add_equality_mconstraint(opt, horizon, constraint_x_update, &p, NULL);
     nlopt_add_equality_mconstraint(opt, horizon, constraint_y_update, &p, NULL);
@@ -88,8 +92,10 @@ bool bicycle_mpc_solver(bicycle_control::BicycleMPC::Request  &req,
     {
         for (int t = 0; t < horizon; t++)
         {
+            ROS_INFO("x[%d]=%f", t, x[get_index(t, StateEnum::X)]);
+            ROS_INFO("y[%d]=%f", t, x[get_index(t, StateEnum::Y)]);
             ROS_INFO("v[%d]=%f", t, x[get_index(t, StateEnum::V)]);
-
+            ROS_INFO("yaw[%d]=%f", t, x[get_index(t, StateEnum::YAW)]);
         }
         double opt_turning_angle = beta_inv_transform(x[get_index(0, StateEnum::BETA)], lr, lf);
         double opt_a = x[get_index(0, StateEnum::ACC)];
