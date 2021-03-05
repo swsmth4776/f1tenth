@@ -46,8 +46,17 @@ bool bicycle_mpc_solver(bicycle_control::BicycleTrajectoryMPC::Request  &req,
     nlopt_set_lower_bounds(opt, lb);
     nlopt_set_upper_bounds(opt, ub);
 
-    ROS_INFO("Final desired x, y, v, yaw: [%f, %f]", (double)req.pos_x.back(),
+    ROS_INFO("Final desired x, y, v, yaw: [%f, %f, %f, %f]", (double)req.pos_x.back(),
             (double)req.pos_y.back(), (double)req.vel.back(), (double)req.yaw.back());
+
+    ROS_INFO("Trajectory requested to track:");
+    for (int t = 0; t < horizon + 1; t++)
+    {
+        ROS_INFO("x[%d]=%f", t, req.pos_x[t]);
+        ROS_INFO("y[%d]=%f", t, req.pos_y[t]);
+        ROS_INFO("v[%d]=%f", t, req.vel[t]);
+        ROS_INFO("yaw[%d]=%f", t, req.yaw[t]);
+    }
 
     trajectory_control_data od{ .alpha = {1.0, 1.0, 1.0, 1.0, 0, 0}};
     std::copy(req.pos_x.begin() + 1, req.pos_x.end(), od.x_desired);
@@ -112,7 +121,7 @@ bool bicycle_mpc_solver(bicycle_control::BicycleTrajectoryMPC::Request  &req,
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "bicycle_mpc_server");
+    ros::init(argc, argv, "bicycle_mpc_trajectory_server");
     ros::NodeHandle n;
 
 // NLOPT_LD_SLSQP is the sequential least squares quadratic programming algorithm[1]
@@ -123,7 +132,7 @@ int main(int argc, char **argv)
 // [1]: https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/#slsqp
 
 
-    ros::ServiceServer service = n.advertiseService("bicycle_mpc", bicycle_mpc_solver);
+    ros::ServiceServer service = n.advertiseService("bicycle_mpc_trajectory", bicycle_mpc_solver);
     ROS_INFO("Ready to solve the bicycle MPC");
     ros::spin();
 

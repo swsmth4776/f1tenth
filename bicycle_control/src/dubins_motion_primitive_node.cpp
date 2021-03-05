@@ -60,10 +60,15 @@ int main(int argc, char **argv)
     int t;
     while (ros::ok())
     {
-        msg.x = std::vector<double>{0};
-        msg.y = std::vector<double>{0};
-        msg.v = std::vector<double>{0};
-        msg.yaw = std::vector<double>{M_PI/2.0f};
+        msg.x.resize(0);
+        msg.y.resize(0);
+        msg.v.resize(0);
+        msg.yaw.resize(0);
+        msg.x.push_back(0);
+        msg.y.push_back(0);
+        msg.v.push_back(0);
+        msg.yaw.push_back(M_PI/2.0);
+
         // x = [x, y, v, theta, a, u]
         state_type x(6);
         x[0] = msg.x[0];
@@ -85,7 +90,6 @@ int main(int argc, char **argv)
             msg.y.push_back(x[1]);
             msg.v.push_back(x[2]);
             msg.yaw.push_back(x[3]);
-
             t++;
         }
         dubins_pub.publish(msg);
@@ -93,10 +97,6 @@ int main(int argc, char **argv)
         loop_rate.sleep();
         ++count;
     }
-
-
-
-
 
     return 0;
 }

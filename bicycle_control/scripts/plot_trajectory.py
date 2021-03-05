@@ -31,7 +31,6 @@ def plot_trajectory(data):
 def listener(graph=False):
     rospy.init_node('trajectory_plotter', anonymous=True)
     rospy.Subscriber("motion_primitive", MotionPrimitive, plot_trajectory)
-    
     rospy.spin()
 
 if __name__ == '__main__':

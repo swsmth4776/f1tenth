@@ -13,8 +13,6 @@ bool first = true;
 
 using namespace boost::numeric::odeint;
 
-template <typename...> struct WhichType;
-
 void motionPrimitiveCallback(const bicycle_control::MotionPrimitive& msg)
 {
     std::lock_guard<std::mutex> lock(m);
@@ -25,7 +23,7 @@ void motionPrimitiveCallback(const bicycle_control::MotionPrimitive& msg)
     first = false;
 
     ros::NodeHandle n;
-    ros::ServiceClient client = n.serviceClient<bicycle_control::BicycleTrajectoryMPC>("bicycle_mpc");
+    ros::ServiceClient client = n.serviceClient<bicycle_control::BicycleTrajectoryMPC>("bicycle_mpc_trajectory");
 
     int motion_primitive_horizon = msg.x.size();
     int num_mpc_calls = motion_primitive_horizon - 20;
